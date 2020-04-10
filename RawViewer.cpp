@@ -15,7 +15,7 @@ using TxtDtor = std::function<void(SDL_Texture *)>;
 
 class RawImageViewer {
 public:
-  RawImageViewer(int width, int height) : mWidth(width), mHeight(height) {
+  RawImageViewer(const std::string &format, int width, int height) : mWidth(width), mHeight(height) {
     if (SDL_Init(SDL_INIT_VIDEO)) {
       throw std::runtime_error("SDL_INIT error");
     }
@@ -35,8 +35,13 @@ public:
     if (mRenderer == nullptr) {
       throw std::runtime_error("SDL_CreateRenderer error");
     }
+
+    if (format == "rgb24") {
+      mFormat = SDL_PIXELFORMAT_RGB24;
+      mStride = mWidth * 3;
+    }
     mTexture = std::unique_ptr<SDL_Texture, TxtDtor>(
-      SDL_CreateTexture(mRenderer.get(), SDL_PIXELFORMAT_RGB24,
+      SDL_CreateTexture(mRenderer.get(), mFormat,
                           SDL_TEXTUREACCESS_STREAMING, width, height),
         [](SDL_Texture *texture) {});
   }
@@ -60,14 +65,19 @@ public:
   void render(const std::vector<char> &buffer) {
     SDL_Rect sourceRect {0, 0, mWidth, mHeight};
     SDL_Rect destRect {0, 0, mWidth, mHeight};
-	  SDL_UpdateTexture(mTexture.get(), &sourceRect, buffer.data(), mWidth * 3);
+	  SDL_UpdateTexture(mTexture.get(), &sourceRect, buffer.data(), mStride);
 	  SDL_RenderCopy(mRenderer.get(), mTexture.get(), &sourceRect, &destRect);
 	  SDL_RenderPresent(mRenderer.get());
   }
 
+  int getStride() {
+    return mStride;
+  }
 private:
   int mWidth;
   int mHeight;
+  uint32_t mFormat;
+  int mStride;
   std::unique_ptr<SDL_Window, WndDtor> mWindow;
   std::unique_ptr<SDL_Renderer, RenDtor> mRenderer;
   std::unique_ptr<SDL_Texture, TxtDtor> mTexture;
@@ -75,25 +85,25 @@ private:
 
 int main(int argc, const char **argv) {
 
-  if (argc < 4) {
-    throw std::runtime_error("usage: ./RawViewer file width height");
+  if (argc < 5) {
+    throw std::runtime_error("usage: ./RawViewer images/red_768x720.rgb24 rgb24 width height");
   }
 
   std::string fileName(*++argv);
+  std::string format(*++argv);
   int width = std::stoi(*++argv);
   int height = std::stoi(*++argv);
-  std::cout << fileName << ":" << width << "x" << height << std::endl;
 
-  RawImageViewer viewer{width, height};
+  RawImageViewer viewer{format, width, height};
 
-  std::vector<char> buf(width * height * 3, 0);
+  std::vector<char> buffer(viewer.getStride() * height, 0);
   std::ifstream ifs(fileName);
   if (ifs.good() == false) {
     throw std::runtime_error("failed to open file");
   }
-  ifs.read(buf.data(), width * height * 3);
+  ifs.read(buffer.data(), buffer.size());
   ifs.close();
-  viewer.render(buf);
+  viewer.render(buffer);
 
   while (viewer.eventHandle())
     ;
