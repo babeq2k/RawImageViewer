@@ -49,14 +49,9 @@ public:
   bool eventHandle() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_QUIT) {
+      if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN) {
         SDL_Quit();
         return false;
-      } else if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.sym == SDLK_ESCAPE) {
-          SDL_Quit();
-          return false;
-        }
       }
     }
     return true;
@@ -88,7 +83,6 @@ int main(int argc, const char **argv) {
   if (argc < 5) {
     throw std::runtime_error("usage: ./RawViewer images/red_768x720.rgb24 rgb24 width height");
   }
-
   std::string fileName(*++argv);
   std::string format(*++argv);
   int width = std::stoi(*++argv);
