@@ -36,10 +36,7 @@ public:
       throw std::runtime_error("SDL_CreateRenderer error");
     }
 
-    if (format == "rgb24") {
-      mFormat = SDL_PIXELFORMAT_RGB24;
-      mStride = mWidth * 3;
-    }
+    setConfig(format);
     mTexture = std::unique_ptr<SDL_Texture, TxtDtor>(
       SDL_CreateTexture(mRenderer.get(), mFormat,
                           SDL_TEXTUREACCESS_STREAMING, width, height),
@@ -65,10 +62,31 @@ public:
 	  SDL_RenderPresent(mRenderer.get());
   }
 
-  int getStride() {
-    return mStride;
+  int inputBufferSize() {
+    if (mFormat == SDL_PIXELFORMAT_RGB24) {
+      return mWidth * mHeight * 3;
+    }
+    if (mFormat == SDL_PIXELFORMAT_NV21 ||
+        mFormat == SDL_PIXELFORMAT_NV12) {
+      return mWidth * mHeight * 3 / 2;
+    }
+    return mWidth * mHeight * 3;
   }
+
 private:
+  void setConfig(const std::string &format) {
+    if (format == "rgb24") {
+      mFormat = SDL_PIXELFORMAT_RGB24;
+      mStride = mWidth * 3;
+    } else if (format == "nv21") {
+      mFormat = SDL_PIXELFORMAT_NV21;
+      mStride = mWidth;
+    } else if (format == "nv12") {
+      mFormat = SDL_PIXELFORMAT_NV12;
+      mStride = mWidth;
+    }
+  }
+
   int mWidth;
   int mHeight;
   uint32_t mFormat;
@@ -76,6 +94,7 @@ private:
   std::unique_ptr<SDL_Window, WndDtor> mWindow;
   std::unique_ptr<SDL_Renderer, RenDtor> mRenderer;
   std::unique_ptr<SDL_Texture, TxtDtor> mTexture;
+
 };
 
 int main(int argc, const char **argv) {
@@ -90,7 +109,7 @@ int main(int argc, const char **argv) {
 
   RawImageViewer viewer{format, width, height};
 
-  std::vector<char> buffer(viewer.getStride() * height, 0);
+  std::vector<char> buffer(viewer.inputBufferSize(), 0);
   std::ifstream ifs(fileName);
   if (ifs.good() == false) {
     throw std::runtime_error("failed to open file");
